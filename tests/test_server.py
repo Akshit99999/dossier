@@ -34,6 +34,9 @@ def test_health_endpoint():
         "provider": "openai",
         "model": "gpt-5.5",
         "provider_configured": False,
+        "database_configured": False,
+        "auth_required": False,
+        "auth_secret_configured": False,
     }
 
 
