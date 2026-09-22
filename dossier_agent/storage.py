@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import DateTime, String, Text, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
@@ -20,7 +21,7 @@ class ResearchRun(Base):
     question: Mapped[str] = mapped_column(Text)
     output_format: Mapped[str] = mapped_column(String(16))
     result: Mapped[str] = mapped_column(Text)
-    response_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    response_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
