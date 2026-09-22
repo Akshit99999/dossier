@@ -9,7 +9,7 @@ Dossier is a live-source research and fact-checking agent. It breaks questions i
 - OpenAI Responses API with the built-in `web_search` tool
 - Provider switching for OpenAI, DeepSeek, and local vLLM-compatible models
 - Optional SearXNG adapter for live sources with DeepSeek and local models
-- Optional in-memory session history (MySQL is not required right now)
+- MySQL persistence for accounts, research runs, and source records, with memory fallback for local smoke tests
 - In-memory request rate limiting for the unauthenticated first deployment
 
 The API key stays on the FastAPI server. The browser only calls the Next.js `/api` proxy.
@@ -25,6 +25,9 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 export OPENAI_API_KEY='your-api-key'
+# Production persistence and accounts:
+export DATABASE_URL='mysql+pymysql://dossier:password@127.0.0.1:3306/dossier'
+export DOSSIER_AUTH_SECRET='replace-with-a-long-random-secret'
 dossier-web
 ```
 
@@ -64,7 +67,7 @@ npm ci
 DOSSIER_API_URL='http://127.0.0.1:8000' npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The interface shows connection/API-key status, research progress, actionable errors, cited output, copy and Markdown/JSON download controls, follow-up research, and recent topics from the current API session.
+Open [http://localhost:3000](http://localhost:3000). With `DATABASE_URL` configured, the interface shows account access, durable history, research progress, actionable errors, cited output, copy and Markdown/JSON download controls, and follow-up research. Without it, the app stays in lightweight session mode.
 
 ## CLI usage
 
@@ -99,7 +102,11 @@ Set `OPENAI_API_KEY` and optionally `DOSSIER_MODEL` as server environment variab
 
 2. Frontend service: deploy `frontend/` on Vercel or another Next.js host. Build with `npm ci && npm run build`, start with `npm start`, and set `DOSSIER_API_URL` to the public API URL before building.
 
-MySQL is deliberately not part of the first deployment: history is session-only, which keeps the initial launch small. Add MySQL later when persistent accounts, research history, and audit logs are needed.
+### MySQL and accounts
+
+Set `DATABASE_URL` to a MySQL SQLAlchemy URL such as `mysql+pymysql://user:password@host:3306/dossier`. On startup, Dossier creates the initial `users`, `research_runs`, and `source_records` tables. The account endpoints are `/api/auth/signup`, `/api/auth/login`, and `/api/auth/me`; when a database is configured, research and history require a bearer session token by default. Set `DOSSIER_REQUIRE_AUTH=0` only for a controlled internal deployment.
+
+Set `DOSSIER_AUTH_SECRET` to a long random value in every deployed API instance. The development fallback is intentionally not suitable for production. For a multi-instance deployment, replace the in-memory request limiter with a shared Redis or gateway limiter.
 
 The first deployment also applies a small in-memory limit of 10 research requests per client per minute. Replace this with account-based quotas or a shared Redis limiter when scaling across multiple API instances.
 
