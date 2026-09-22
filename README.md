@@ -63,7 +63,7 @@ npm ci
 DOSSIER_API_URL='http://127.0.0.1:8000' npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The interface shows connection/API-key status, research progress, actionable errors, cited output, copy controls, and recent topics from the current API session.
+Open [http://localhost:3000](http://localhost:3000). The interface shows connection/API-key status, research progress, actionable errors, cited output, copy and Markdown/JSON download controls, follow-up research, and recent topics from the current API session.
 
 ## CLI usage
 
