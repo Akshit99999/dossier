@@ -61,8 +61,8 @@ def research(request: ResearchRequest) -> dict:
 def main() -> None:
     uvicorn.run(
         "dossier_agent.server:app",
-        host=os.getenv("DOSSIER_HOST", "127.0.0.1"),
-        port=int(os.getenv("DOSSIER_PORT", "8000")),
+        host=os.getenv("DOSSIER_HOST", "0.0.0.0"),
+        port=int(os.getenv("PORT", os.getenv("DOSSIER_PORT", "8000"))),
         reload=os.getenv("DOSSIER_RELOAD", "0") == "1",
     )
 
