@@ -42,6 +42,8 @@ dossier-web
 
 The API runs at `http://127.0.0.1:8000`.
 
+Deployment probes are available at `/api/health/live` and `/api/health/ready`; the latter checks the configured database connection.
+
 Provider configuration:
 
 ```bash
