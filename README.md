@@ -31,6 +31,15 @@ export DOSSIER_AUTH_SECRET='replace-with-a-long-random-secret'
 dossier-web
 ```
 
+For a local MySQL instance, copy `.env.example`, adjust any secrets, and run:
+
+```bash
+docker compose up -d mysql
+export DATABASE_URL='mysql+pymysql://dossier:dossier_dev_password@127.0.0.1:3306/dossier'
+export DOSSIER_AUTH_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+dossier-web
+```
+
 The API runs at `http://127.0.0.1:8000`.
 
 Provider configuration:
