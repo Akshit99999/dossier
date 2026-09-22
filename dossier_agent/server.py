@@ -84,10 +84,18 @@ def research(request: ResearchRequest) -> dict:
     except (DossierError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        if not request.provider and not os.getenv("OPENAI_API_KEY"):
+        try:
+            config = resolve_provider(request.provider, request.model)
+        except ValueError:
+            config = None
+        if config and not config.api_key_configured:
+            key_name = {
+                "openai": "OPENAI_API_KEY",
+                "deepseek": "DEEPSEEK_API_KEY",
+            }.get(config.name, "the provider credential")
             raise HTTPException(
                 status_code=503,
-                detail="OPENAI_API_KEY is not configured. Add it to the server environment and restart Dossier.",
+                detail=f"{config.name.title()} is not configured. Add {key_name} to the server environment and restart Dossier.",
             ) from exc
         raise HTTPException(
             status_code=500,
