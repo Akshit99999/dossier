@@ -54,3 +54,11 @@ def test_history_endpoint_is_available():
     response = TestClient(server.app).get("/api/history")
     assert response.status_code == 200
     assert "items" in response.json()
+
+
+def test_deployment_health_probes():
+    client = TestClient(server.app)
+    assert client.get("/api/health/live").json() == {"status": "ok", "service": "dossier"}
+    readiness = client.get("/api/health/ready")
+    assert readiness.status_code == 200
+    assert readiness.json()["database"] == "not_configured"
