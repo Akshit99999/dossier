@@ -230,6 +230,7 @@ def research(request: ResearchRequest, http_request: Request) -> dict:
         payload: str | dict = result.text
         if request.output_format == "json":
             payload = result.as_json()
+        persisted_research_id: Optional[int] = None
         if identity and database_configured():
             ensure_database()
             with session_scope() as session:
@@ -245,6 +246,7 @@ def research(request: ResearchRequest, http_request: Request) -> dict:
                 )
                 session.add(run)
                 session.flush()
+                persisted_research_id = run.id
                 for position, url in enumerate(extract_urls(result.text), start=1):
                     session.add(
                         SourceRecord(
@@ -268,6 +270,7 @@ def research(request: ResearchRequest, http_request: Request) -> dict:
             "format": request.output_format,
             "result": payload,
             "response_id": result.response_id,
+            "research_id": persisted_research_id,
         }
     except (DossierError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -291,6 +294,40 @@ def research(request: ResearchRequest, http_request: Request) -> dict:
             status_code=500,
             detail="The research service could not complete this request. Check the server logs and try again.",
         ) from exc
+
+
+@app.get("/api/research/{research_id}")
+def research_detail(research_id: int, http_request: Request) -> dict[str, object]:
+    identity = require_identity(http_request)
+    require_database()
+    try:
+        ensure_database()
+        with session_scope() as session:
+            run = session.get(ResearchRun, research_id)
+            if run is None or run.user_id != identity.user_id:
+                raise HTTPException(status_code=404, detail="Research run not found.")
+            return {
+                "id": run.id,
+                "question": run.question,
+                "result": run.result_text,
+                "provider": run.provider,
+                "model": run.model,
+                "created_at": run.created_at.isoformat(),
+                "sources": [
+                    {
+                        "id": source.id,
+                        "position": source.position,
+                        "title": source.title,
+                        "url": source.url,
+                        "snippet": source.snippet,
+                    }
+                    for source in run.sources
+                ],
+            }
+    except HTTPException:
+        raise
+    except (StorageNotConfigured, SQLAlchemyError) as exc:
+        raise HTTPException(status_code=503, detail="Persistent research is unavailable right now.") from exc
 
 
 def extract_urls(text: str) -> list[str]:
