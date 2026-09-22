@@ -47,9 +47,9 @@ Deployment probes are available at `/api/health/live` and `/api/health/ready`; t
 Provider configuration:
 
 ```bash
-# Default: OpenAI with native web search
-export MODEL_PROVIDER=openai
-export OPENAI_API_KEY='your-api-key'
+# Default: DeepSeek hosted model
+export MODEL_PROVIDER=deepseek
+export DEEPSEEK_API_KEY='your-api-key'
 
 # Hosted DeepSeek
 export MODEL_PROVIDER=deepseek
