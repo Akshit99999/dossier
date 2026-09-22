@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, Text, create_engine
+from sqlalchemy import DateTime, String, Text, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -62,3 +62,26 @@ def save_research_run(
             )
         )
         session.commit()
+
+
+def list_recent_runs(limit: int = 20) -> list[dict[str, str | int | None]]:
+    """Return the most recent research topics for the history panel."""
+
+    factory = _session_factory()
+    if factory is None:
+        return []
+    safe_limit = max(1, min(limit, 100))
+    with factory() as session:
+        runs = session.scalars(
+            select(ResearchRun).order_by(ResearchRun.created_at.desc()).limit(safe_limit)
+        ).all()
+        return [
+            {
+                "id": run.id,
+                "question": run.question,
+                "output_format": run.output_format,
+                "response_id": run.response_id,
+                "created_at": run.created_at.isoformat(),
+            }
+            for run in runs
+        ]
