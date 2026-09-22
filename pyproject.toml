@@ -12,6 +12,7 @@ license = "MIT"
 authors = [{ name = "Akshit Sharma", email = "akshitsharma684@gmail.com" }]
 dependencies = [
     "openai>=1.0.0",
+    "httpx>=0.27.0",
     "fastapi>=0.110.0",
     "uvicorn[standard]>=0.29.0",
 ]
