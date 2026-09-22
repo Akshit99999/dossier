@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
 
 from dossier_agent import server
 
@@ -15,6 +16,7 @@ class FakeAgent:
     def __init__(self, model=None, live_web=True):
         self.model = model
         self.live_web = live_web
+        self.provider_config = SimpleNamespace(name="openai")
 
     def research(self, question, *, output_format="human"):
         assert question == "Test the claim"
