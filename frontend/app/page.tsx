@@ -16,8 +16,6 @@ type HealthResponse = {
   openai_configured?: boolean;
   provider?: string;
   provider_configured?: boolean;
-  database_configured?: boolean;
-  auth_required?: boolean;
 };
 
 type HistoryItem = {
@@ -72,21 +70,10 @@ export default function Home() {
   const [followUp, setFollowUp] = useState("");
   const [apiReady, setApiReady] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [authToken, setAuthToken] = useState("");
-  const [accountEmail, setAccountEmail] = useState("");
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
-  const [authBusy, setAuthBusy] = useState(false);
-  const [authError, setAuthError] = useState("");
-  const [authRequired, setAuthRequired] = useState(false);
-  const [databaseConfigured, setDatabaseConfigured] = useState(false);
 
-  async function loadHistory(token = authToken) {
+  async function loadHistory() {
     try {
-      const result = await fetch("/api/history", {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
+      const result = await fetch("/api/history");
       if (!result.ok) return;
       const payload = (await result.json()) as { items?: HistoryItem[] };
       setHistory(payload.items ?? []);
@@ -96,20 +83,14 @@ export default function Home() {
   }
 
   useEffect(() => {
-    const storedToken = window.localStorage.getItem("dossier_token") ?? "";
-    const storedEmail = window.localStorage.getItem("dossier_email") ?? "";
-    setAuthToken(storedToken);
-    setAccountEmail(storedEmail);
     fetch("/api/health")
       .then((res) => res.json() as Promise<HealthResponse>)
       .then((health) => {
         setApiReady(health.provider_configured !== false);
-        setAuthRequired(health.auth_required === true);
-        setDatabaseConfigured(health.database_configured === true);
         if (health.provider) setProvider(health.provider);
       })
       .catch(() => setApiReady(null));
-    loadHistory(storedToken);
+    loadHistory();
   }, []);
 
   const displayedResult = useMemo(
@@ -126,10 +107,7 @@ export default function Home() {
     try {
       const result = await fetch("/api/research", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: trimmedQuestion,
           output_format: format,
@@ -187,41 +165,6 @@ export default function Home() {
     await investigate(nextQuestion, lastResearchId);
   }
 
-  async function handleAuth(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!authEmail.trim() || !authPassword || authBusy) return;
-    setAuthBusy(true);
-    setAuthError("");
-    try {
-      const result = await fetch(`/api/auth/${authMode}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: authEmail.trim(), password: authPassword }),
-      });
-      const payload = (await result.json()) as { token?: string; user?: { email?: string }; detail?: string };
-      if (!result.ok || !payload.token) throw new Error(payload.detail || "Account request failed.");
-      const email = payload.user?.email || authEmail.trim().toLowerCase();
-      window.localStorage.setItem("dossier_token", payload.token);
-      window.localStorage.setItem("dossier_email", email);
-      setAuthToken(payload.token);
-      setAccountEmail(email);
-      setAuthPassword("");
-      await loadHistory(payload.token);
-    } catch (requestError) {
-      setAuthError(requestError instanceof Error ? requestError.message : "Account request failed.");
-    } finally {
-      setAuthBusy(false);
-    }
-  }
-
-  function signOut() {
-    window.localStorage.removeItem("dossier_token");
-    window.localStorage.removeItem("dossier_email");
-    setAuthToken("");
-    setAccountEmail("");
-    setHistory([]);
-  }
-
   return (
     <main className="shell">
       <header className="topbar">
@@ -234,23 +177,6 @@ export default function Home() {
           {apiReady === false ? "API key needed" : apiReady === null ? "Checking connection" : "Evidence-first research"}
         </div>
       </header>
-
-      {databaseConfigured && authRequired && (
-        <section className="account-panel" aria-label="Account access">
-          {authToken ? (
-            <div className="account-signed-in"><span>Signed in as <b>{accountEmail}</b></span><button type="button" className="copy-button" onClick={signOut}>Sign out</button></div>
-          ) : (
-            <form className="account-form" onSubmit={handleAuth}>
-              <div className="account-copy"><span className="step-number">ACCOUNT</span><span>{authMode === "login" ? "Sign in to save your research" : "Create your research account"}</span></div>
-              <input aria-label="Account email" type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" required />
-              <input aria-label="Account password" type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="At least 8 characters" autoComplete={authMode === "login" ? "current-password" : "new-password"} required />
-              <button type="submit" className="copy-button" disabled={authBusy}>{authBusy ? "Working…" : authMode === "login" ? "Sign in" : "Create account"}</button>
-              <button type="button" className="account-switch" onClick={() => { setAuthMode(authMode === "login" ? "signup" : "login"); setAuthError(""); }}>{authMode === "login" ? "Need an account? Create one" : "Already have an account? Sign in"}</button>
-              {authError && <p className="error" role="alert">{authError}</p>}
-            </form>
-          )}
-        </section>
-      )}
 
       <section className="hero">
         <p className="eyebrow">DEEP RESEARCH / FACT CHECKING</p>
