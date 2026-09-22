@@ -29,12 +29,22 @@ Machine-readable JSON:
 dossier --format json "What changed in India's data-protection rules in 2026?"
 ```
 
+Browser frontend:
+
+```bash
+python -m pip install -e '.[dev]'
+dossier-web
+```
+
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000). The frontend sends requests to the local FastAPI server and never exposes your API key to the browser.
+
 The `--no-web` option is available for testing or environments where live search is unavailable. In that mode, the agent instructs the model to mark claims as unverified unless supported by the available context.
 
 ## Project layout
 
 ```text
-dossier_agent/  Python package and CLI
+dossier_agent/  Python package, CLI, and web server
+web/            Browser frontend
 tests/          Offline unit tests
 ```
 

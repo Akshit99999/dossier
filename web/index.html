@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0d1117" />
+    <title>Dossier — Research with evidence</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="grain" aria-hidden="true"></div>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Dossier home">
+          <span class="brand-mark">D</span>
+          <span>Dossier</span>
+        </a>
+        <div class="topbar-meta"><span class="live-dot"></span> Evidence-first research</div>
+      </header>
+
+      <section class="hero">
+        <p class="eyebrow">DEEP RESEARCH / FACT CHECKING</p>
+        <h1>Ask a question.<br /><em>Get the evidence.</em></h1>
+        <p class="hero-copy">Dossier searches live sources, cross-checks claims, and makes uncertainty visible.</p>
+      </section>
+
+      <section class="workspace" aria-label="Research workspace">
+        <form id="research-form" class="research-card">
+          <div class="card-heading">
+            <div>
+              <span class="step-number">01</span>
+              <span class="heading-label">Your research brief</span>
+            </div>
+            <span class="key-hint">⌘ ↵ to run</span>
+          </div>
+          <label class="sr-only" for="question">Question or claim to research</label>
+          <textarea id="question" name="question" rows="6" required maxlength="10000" placeholder="What would you like to verify?"></textarea>
+          <div class="suggestions" aria-label="Example questions">
+            <button type="button" class="suggestion">Is this health claim supported by current evidence?</button>
+            <button type="button" class="suggestion">What changed in this policy this year?</button>
+            <button type="button" class="suggestion">Fact-check this statement and find missing context.</button>
+          </div>
+          <div class="controls">
+            <label class="select-wrap">
+              <span>Output</span>
+              <select id="output-format" name="output_format">
+                <option value="human">Research report</option>
+                <option value="json">Structured JSON</option>
+              </select>
+            </label>
+            <label class="select-wrap model-control">
+              <span>Model <small>optional</small></span>
+              <input id="model" name="model" type="text" placeholder="Default model" autocomplete="off" />
+            </label>
+            <label class="toggle-wrap">
+              <input id="live-web" name="live_web" type="checkbox" checked />
+              <span class="toggle" aria-hidden="true"></span>
+              <span>Live web</span>
+            </label>
+            <button id="submit-button" class="run-button" type="submit">
+              <span class="button-label">Investigate <span class="arrow">↗</span></span>
+              <span class="button-loading" aria-hidden="true"><span class="spinner"></span> Researching</span>
+            </button>
+          </div>
+          <p id="error" class="error" role="alert" hidden></p>
+        </form>
+
+        <section id="result-panel" class="result-card" aria-live="polite">
+          <div class="result-empty">
+            <div class="empty-icon">✦</div>
+            <p class="empty-kicker">YOUR DOSSIER WILL APPEAR HERE</p>
+            <p class="empty-copy">Start with a question that has a claim, a date, or a decision behind it.</p>
+          </div>
+        </section>
+      </section>
+
+      <footer class="footer">
+        <span>Dossier <span id="year"></span></span>
+        <span>Sources are cited inline · Verify high-stakes decisions independently</span>
+      </footer>
+    </main>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
