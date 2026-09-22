@@ -65,6 +65,7 @@ export default function Home() {
   const [response, setResponse] = useState<ApiResponse | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [followUp, setFollowUp] = useState("");
   const [apiReady, setApiReady] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
@@ -95,11 +96,7 @@ export default function Home() {
     [response],
   );
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmedQuestion = question.trim();
-    if (!trimmedQuestion || runState === "loading") return;
-
+  async function investigate(trimmedQuestion: string) {
     setRunState("loading");
     setResponse(null);
     setError("");
@@ -128,10 +125,40 @@ export default function Home() {
     }
   }
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion || runState === "loading") return;
+    await investigate(trimmedQuestion);
+  }
+
   async function copyResult() {
     await navigator.clipboard.writeText(displayedResult);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  function downloadResult(extension: "md" | "json") {
+    if (!response) return;
+    const body = extension === "json"
+      ? JSON.stringify({ question, result: response.result, response_id: response.response_id }, null, 2)
+      : `# Dossier Research Report\n\n**Question:** ${question}\n\n${displayedResult}\n`;
+    const blob = new Blob([body], { type: extension === "json" ? "application/json" : "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `dossier-${new Date().toISOString().slice(0, 10)}.${extension}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function runFollowUp() {
+    const trimmedFollowUp = followUp.trim();
+    if (!trimmedFollowUp || runState === "loading") return;
+    const nextQuestion = `${question.trim()}\n\nFollow-up request: ${trimmedFollowUp}`;
+    setQuestion(nextQuestion);
+    setFollowUp("");
+    await investigate(nextQuestion);
   }
 
   return (
@@ -251,9 +278,16 @@ export default function Home() {
             <div className="result-content result-ready">
               <div className="result-toolbar">
                 <span className="result-title">Research dossier</span>
-                <div className="result-actions"><span className="result-meta">{response.response_id ? "Verified response" : "Completed"}</span><button type="button" className="copy-button" onClick={copyResult}>{copied ? "Copied" : "Copy"}</button></div>
+                <div className="result-actions"><span className="result-meta">{response.response_id ? "Verified response" : "Completed"}</span><button type="button" className="copy-button" onClick={copyResult}>{copied ? "Copied" : "Copy"}</button><button type="button" className="copy-button" onClick={() => downloadResult("md")}>.md</button><button type="button" className="copy-button" onClick={() => downloadResult("json")}>.json</button></div>
               </div>
               <pre className="report">{renderWithLinks(displayedResult)}</pre>
+              <div className="follow-up">
+                <label htmlFor="follow-up">Continue this research</label>
+                <div className="follow-up-row">
+                  <input id="follow-up" value={followUp} onChange={(event) => setFollowUp(event.target.value)} placeholder="Ask a focused follow-up question" onKeyDown={(event) => { if (event.key === "Enter") void runFollowUp(); }} />
+                  <button type="button" className="copy-button follow-up-button" onClick={() => void runFollowUp()} disabled={!followUp.trim()}>Run follow-up</button>
+                </div>
+              </div>
             </div>
           )}
           {runState === "error" && (
