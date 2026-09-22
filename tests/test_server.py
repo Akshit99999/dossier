@@ -28,6 +28,9 @@ def test_health_endpoint():
         "status": "ok",
         "service": "dossier",
         "openai_configured": False,
+        "provider": "openai",
+        "model": "gpt-5.5",
+        "provider_configured": False,
     }
 
 
@@ -39,3 +42,9 @@ def test_research_endpoint_returns_json(monkeypatch):
     )
     assert response.status_code == 200
     assert response.json()["result"]["verdict"] == "confirmed"
+
+
+def test_history_endpoint_is_available():
+    response = TestClient(server.app).get("/api/history")
+    assert response.status_code == 200
+    assert "items" in response.json()
