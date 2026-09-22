@@ -13,9 +13,10 @@ class FakeResult:
 
 
 class FakeAgent:
-    def __init__(self, model=None, live_web=True):
+    def __init__(self, model=None, live_web=True, provider=None):
         self.model = model
         self.live_web = live_web
+        self.provider = provider
         self.provider_config = SimpleNamespace(name="openai")
 
     def research(self, question, *, output_format="human"):
