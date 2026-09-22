@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import json
 from typing import Literal, Optional
 
 import uvicorn
@@ -10,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .agent import DossierAgent, DossierError
+from .storage import list_recent_runs, save_research_run, storage_configured
 
 
 app = FastAPI(title="Dossier", description="Live-source research and fact-checking agent")
@@ -23,12 +25,21 @@ class ResearchRequest(BaseModel):
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
+def health() -> dict[str, object]:
     return {
         "status": "ok",
         "service": "dossier",
         "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "database_configured": storage_configured(),
     }
+
+
+@app.get("/api/history")
+def history(limit: int = 20) -> dict[str, list[dict]]:
+    try:
+        return {"items": list_recent_runs(limit)}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Research history is temporarily unavailable.") from exc
 
 
 @app.post("/api/research")
@@ -39,6 +50,12 @@ def research(request: ResearchRequest) -> dict:
         payload: str | dict = result.text
         if request.output_format == "json":
             payload = result.as_json()
+        save_research_run(
+            question=request.question,
+            output_format=request.output_format,
+            result=payload if isinstance(payload, str) else json.dumps(payload),
+            response_id=result.response_id,
+        )
         return {
             "format": request.output_format,
             "result": payload,
