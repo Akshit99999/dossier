@@ -22,7 +22,7 @@ class ProviderConfig:
 def resolve_provider(provider: str | None = None, model: str | None = None) -> ProviderConfig:
     """Resolve provider settings from explicit values and environment variables."""
 
-    name = (provider or os.getenv("MODEL_PROVIDER", "openai")).strip().lower()
+    name = (provider or os.getenv("MODEL_PROVIDER", "deepseek")).strip().lower()
     if name == "openai":
         return ProviderConfig(
             name=name,
