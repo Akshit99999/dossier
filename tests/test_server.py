@@ -34,9 +34,6 @@ def test_health_endpoint():
         "provider": "deepseek",
         "model": "deepseek-reasoner",
         "provider_configured": False,
-        "database_configured": False,
-        "auth_required": False,
-        "auth_secret_configured": False,
     }
 
 
@@ -61,4 +58,4 @@ def test_deployment_health_probes():
     assert client.get("/api/health/live").json() == {"status": "ok", "service": "dossier"}
     readiness = client.get("/api/health/ready")
     assert readiness.status_code == 200
-    assert readiness.json()["database"] == "not_configured"
+    assert readiness.json()["storage"] == "memory"
