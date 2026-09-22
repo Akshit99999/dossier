@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -25,7 +25,7 @@ app.mount("/static", StaticFiles(directory=WEB_ROOT), name="static")
 class ResearchRequest(BaseModel):
     question: str = Field(min_length=1, max_length=10_000)
     output_format: Literal["human", "json"] = "human"
-    model: str | None = Field(default=None, max_length=100)
+    model: Optional[str] = Field(default=None, max_length=100)
     live_web: bool = True
 
 
