@@ -36,7 +36,11 @@ def index() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "dossier"}
+    return {
+        "status": "ok",
+        "service": "dossier",
+        "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
+    }
 
 
 @app.post("/api/research")
@@ -55,7 +59,15 @@ def research(request: ResearchRequest) -> dict:
     except (DossierError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail="Research service failed.") from exc
+        if not os.getenv("OPENAI_API_KEY"):
+            raise HTTPException(
+                status_code=503,
+                detail="OPENAI_API_KEY is not configured. Add it to the server environment and restart Dossier.",
+            ) from exc
+        raise HTTPException(
+            status_code=500,
+            detail="The research service could not complete this request. Check the server logs and try again.",
+        ) from exc
 
 
 def main() -> None:
