@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from openai import OpenAI
+from .providers import ProviderConfig, build_client, resolve_provider
 
 
 DEFAULT_SYSTEM_PROMPT = """You are Dossier, a deep-research and fact-checking agent.
@@ -80,9 +80,11 @@ class DossierAgent:
         model: str | None = None,
         live_web: bool = True,
         prompt_path: Path | None = None,
+        provider: str | None = None,
     ) -> None:
-        self.client = client or OpenAI()
-        self.model = model or os.getenv("DOSSIER_MODEL", "gpt-5.5")
+        self.provider_config: ProviderConfig = resolve_provider(provider, model)
+        self.client = client or build_client(self.provider_config)
+        self.model = self.provider_config.model
         self.live_web = live_web
         self.system_prompt = load_system_prompt(prompt_path)
 
@@ -102,6 +104,8 @@ class DossierAgent:
         )
         web_instruction = (
             "You have live web search. Use it actively, search each sub-claim, and include numbered source URLs."
+            if self.live_web and self.provider_config.native_web_search
+            else "This provider has no native live web search. Do not claim that you searched; mark unsupported claims UNVERIFIED."
             if self.live_web
             else "Live web search is unavailable. Do not claim that you searched; mark unsupported claims UNVERIFIED."
         )
@@ -114,21 +118,32 @@ class DossierAgent:
             ]
         )
 
-        kwargs: dict[str, Any] = {
-            "model": self.model,
-            "instructions": self.system_prompt,
-            "input": input_text,
-            "store": False,
-        }
-        if self.live_web:
-            kwargs["tools"] = [{"type": "web_search"}]
-
         try:
-            response = self.client.responses.create(**kwargs)
+            if self.provider_config.native_web_search:
+                kwargs: dict[str, Any] = {
+                    "model": self.model,
+                    "instructions": self.system_prompt,
+                    "input": input_text,
+                    "store": False,
+                }
+                if self.live_web:
+                    kwargs["tools"] = [{"type": "web_search"}]
+                response = self.client.responses.create(**kwargs)
+                text = getattr(response, "output_text", None)
+                response_id = getattr(response, "id", None)
+            else:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": input_text},
+                    ],
+                )
+                text = response.choices[0].message.content
+                response_id = getattr(response, "id", None)
         except Exception as exc:  # SDK exceptions vary by installed version.
-            raise DossierError(f"OpenAI request failed: {exc}") from exc
+            raise DossierError(f"{self.provider_config.name} request failed: {exc}") from exc
 
-        text = getattr(response, "output_text", None)
         if not text:
-            raise DossierError("OpenAI returned no output text.")
-        return ResearchResult(text=text, response_id=getattr(response, "id", None))
+            raise DossierError(f"{self.provider_config.name} returned no output text.")
+        return ResearchResult(text=text, response_id=response_id)
