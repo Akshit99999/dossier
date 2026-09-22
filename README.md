@@ -1,60 +1,96 @@
 # Dossier
 
-Dossier is a command-line deep-research and fact-checking agent. The original private source prompt is intentionally not included in this public repository.
+Dossier is a live-source research and fact-checking agent. It breaks questions into checkable claims, searches the web, weighs evidence, and returns a cited report or structured JSON. The original private source prompt is intentionally not included in this public repository.
 
-It uses the OpenAI Responses API with the built-in web-search tool, then produces either a cited human-readable report or the JSON format defined by the research workflow.
+## Stack
 
-## Setup
+- Next.js 16 App Router + React 19 + TypeScript frontend
+- FastAPI + Uvicorn research API
+- OpenAI Responses API with the built-in `web_search` tool
+- Optional in-memory session history (MySQL is not required right now)
+
+The API key stays on the FastAPI server. The browser only calls the Next.js `/api` proxy.
+
+## Run locally
+
+Prerequisites: Python 3.9+ and Node.js 20.9+.
+
+### 1. Start the API
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 export OPENAI_API_KEY='your-api-key'
-```
-
-`OPENAI_API_KEY` is required. The default model is `gpt-5.5`; set `DOSSIER_MODEL` or pass `--model` to use another model available to your account. To use a private local system prompt, set `DOSSIER_SYSTEM_PROMPT_PATH`; files under `prompts/` are ignored by Git.
-
-## Usage
-
-Human-readable report:
-
-```bash
-dossier "Is the claim that coffee dehydrates you supported by current evidence?"
-```
-
-Machine-readable JSON:
-
-```bash
-dossier --format json "What changed in India's data-protection rules in 2026?"
-```
-
-Browser frontend:
-
-```bash
-python -m pip install -e '.[dev]'
 dossier-web
 ```
 
-Then open [http://127.0.0.1:8000](http://127.0.0.1:8000). The frontend sends requests to the local FastAPI server and never exposes your API key to the browser.
+The API runs at `http://127.0.0.1:8000`.
 
-The `--no-web` option is available for testing or environments where live search is unavailable. In that mode, the agent instructs the model to mark claims as unverified unless supported by the available context.
+### 2. Start the Next.js frontend
+
+In a second terminal:
+
+```bash
+cd frontend
+npm ci
+DOSSIER_API_URL='http://127.0.0.1:8000' npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The interface shows connection/API-key status, research progress, actionable errors, cited output, copy controls, and recent topics from the current API session.
+
+## CLI usage
+
+```bash
+dossier "Is the claim that coffee dehydrates you supported by current evidence?"
+dossier --format json "What changed in India's data-protection rules in 2026?"
+```
+
+Use `--no-web` for offline testing. Unsupported claims should then be marked unverified.
+
+## Why output may not appear
+
+If the result panel reports that the API key is needed, set `OPENAI_API_KEY` in the same terminal that starts `dossier-web`, then restart the API. Check the API directly with:
+
+```bash
+curl http://127.0.0.1:8000/api/health
+```
+
+The response includes `openai_configured`. A real research request also requires an OpenAI API key with access to the selected model and web search.
+
+## Deploy simply
+
+Deploy the two services separately:
+
+1. API service: deploy the repository root on Railway, Render, or another Python host. Start command:
+
+   ```bash
+   uvicorn dossier_agent.server:app --host 0.0.0.0 --port $PORT
+   ```
+
+   Set `OPENAI_API_KEY` and optionally `DOSSIER_MODEL` as server environment variables. Do not commit them.
+
+2. Frontend service: deploy `frontend/` on Vercel or another Next.js host. Build with `npm ci && npm run build`, start with `npm start`, and set `DOSSIER_API_URL` to the public API URL before building.
+
+MySQL is deliberately not part of the first deployment: history is session-only, which keeps the initial launch small. Add MySQL later when persistent accounts, research history, and audit logs are needed.
 
 ## Project layout
 
 ```text
-dossier_agent/  Python package, CLI, and web server
-web/            Browser frontend
-tests/          Offline unit tests
+dossier_agent/           Python API, CLI, and research agent
+frontend/app/            Next.js App Router pages and styles
+frontend/next.config.ts  API proxy configuration
+tests/                   Python API and agent tests
 ```
 
-## Development
+## Verification
 
 ```bash
 pytest
+cd frontend && npm run typecheck && npm run build
 ```
 
-Research requests use the OpenAI API and may incur API and web-search charges. The application does not store responses locally; the API's own data-retention settings apply.
+Research requests use the OpenAI API and may incur API and web-search charges. High-stakes decisions should be independently verified.
 
 ## License
 
