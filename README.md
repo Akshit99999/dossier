@@ -8,6 +8,7 @@ Dossier is a live-source research and fact-checking agent. It breaks questions i
 - FastAPI + Uvicorn research API
 - OpenAI Responses API with the built-in `web_search` tool
 - Provider switching for OpenAI, DeepSeek, and local vLLM-compatible models
+- Optional SearXNG adapter for live sources with DeepSeek and local models
 - Optional in-memory session history (MySQL is not required right now)
 
 The API key stays on the FastAPI server. The browser only calls the Next.js `/api` proxy.
@@ -44,7 +45,13 @@ export MODEL_PROVIDER=local
 export LOCAL_MODEL_BASE_URL='http://127.0.0.1:8001/v1'
 ```
 
-OpenAI is the only provider currently connected to the built-in web-search tool. DeepSeek and local models work for model generation; an independent search adapter will be added before using them for live-source research.
+OpenAI uses the built-in web-search tool. DeepSeek and local models can use an independent SearXNG instance for live-source research:
+
+```bash
+export SEARXNG_URL='http://127.0.0.1:8080'
+```
+
+If `SEARXNG_URL` is not set, those providers still run as generation-only models and must label unsupported claims `UNVERIFIED`.
 
 ### 2. Start the Next.js frontend
 
@@ -87,7 +94,7 @@ Deploy the two services separately:
    uvicorn dossier_agent.server:app --host 0.0.0.0 --port $PORT
    ```
 
-   Set `OPENAI_API_KEY` and optionally `DOSSIER_MODEL` as server environment variables. Do not commit them.
+Set `OPENAI_API_KEY` and optionally `DOSSIER_MODEL` as server environment variables. For DeepSeek or local models, set the matching provider variables and optionally `SEARXNG_URL`. Do not commit secrets.
 
 2. Frontend service: deploy `frontend/` on Vercel or another Next.js host. Build with `npm ci && npm run build`, start with `npm start`, and set `DOSSIER_API_URL` to the public API URL before building.
 
