@@ -10,6 +10,7 @@ Dossier is a live-source research and fact-checking agent. It breaks questions i
 - Provider switching for OpenAI, DeepSeek, and local vLLM-compatible models
 - Optional SearXNG adapter for live sources with DeepSeek and local models
 - Optional in-memory session history (MySQL is not required right now)
+- In-memory request rate limiting for the unauthenticated first deployment
 
 The API key stays on the FastAPI server. The browser only calls the Next.js `/api` proxy.
 
@@ -99,6 +100,8 @@ Set `OPENAI_API_KEY` and optionally `DOSSIER_MODEL` as server environment variab
 2. Frontend service: deploy `frontend/` on Vercel or another Next.js host. Build with `npm ci && npm run build`, start with `npm start`, and set `DOSSIER_API_URL` to the public API URL before building.
 
 MySQL is deliberately not part of the first deployment: history is session-only, which keeps the initial launch small. Add MySQL later when persistent accounts, research history, and audit logs are needed.
+
+The first deployment also applies a small in-memory limit of 10 research requests per client per minute. Replace this with account-based quotas or a shared Redis limiter when scaling across multiple API instances.
 
 ## Project layout
 
