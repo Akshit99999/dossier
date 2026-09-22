@@ -295,7 +295,7 @@ export default function Home() {
               <div className="failure-icon">!</div>
               <p className="result-title">The dossier could not be completed</p>
               <p className="failure-message">{error}</p>
-              <p className="failure-help">If you are running locally, set <code>OPENAI_API_KEY</code> before starting the FastAPI server.</p>
+              <p className="failure-help">Configure the selected provider credential on the API service, then restart FastAPI.</p>
             </div>
           )}
         </section>
