@@ -32,7 +32,7 @@ def test_builtin_policy_is_available_without_private_prompt_file():
 
 def test_live_research_uses_web_search_and_prompt():
     client = FakeClient()
-    agent = DossierAgent(client=client, model="test-model")
+    agent = DossierAgent(client=client, model="test-model", provider="openai")
 
     result = agent.research("Is this claim supported?", output_format="human")
 
@@ -47,7 +47,7 @@ def test_live_research_uses_web_search_and_prompt():
 
 def test_offline_mode_omits_web_tool():
     client = FakeClient()
-    DossierAgent(client=client, live_web=False).research("Question")
+    DossierAgent(client=client, provider="openai", live_web=False).research("Question")
     assert "tools" not in client.responses.calls[0]
     assert "Live web search is unavailable" in client.responses.calls[0]["input"]
 
