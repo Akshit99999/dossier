@@ -15,6 +15,13 @@ type HealthResponse = {
   openai_configured?: boolean;
 };
 
+type HistoryItem = {
+  id: number;
+  question: string;
+  output_format: OutputFormat;
+  created_at: string;
+};
+
 const suggestions = [
   "Is this health claim supported by current evidence?",
   "What changed in this policy this year?",
@@ -56,12 +63,25 @@ export default function Home() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [apiReady, setApiReady] = useState<boolean | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  async function loadHistory() {
+    try {
+      const result = await fetch("/api/history");
+      if (!result.ok) return;
+      const payload = (await result.json()) as { items?: HistoryItem[] };
+      setHistory(payload.items ?? []);
+    } catch {
+      // History is a convenience panel; research remains usable if it is unavailable.
+    }
+  }
 
   useEffect(() => {
     fetch("/api/health")
       .then((res) => res.json() as Promise<HealthResponse>)
       .then((health) => setApiReady(health.openai_configured !== false))
       .catch(() => setApiReady(null));
+    loadHistory();
   }, []);
 
   const displayedResult = useMemo(
@@ -94,6 +114,7 @@ export default function Home() {
       if (!result.ok) throw new Error(payload.detail || "The research request failed.");
       setResponse(payload);
       setRunState("ready");
+      loadHistory();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Something went wrong.");
       setRunState("error");
@@ -229,6 +250,25 @@ export default function Home() {
             </div>
           )}
         </section>
+      </section>
+
+      <section className="history-panel" aria-label="Recent research history">
+        <div className="history-heading">
+          <div><span className="step-number">02</span><span className="heading-label">Recent research</span></div>
+          <span className="history-note">Current session</span>
+        </div>
+        {history.length === 0 ? (
+          <p className="history-empty">Your researched topics will appear here as you investigate them.</p>
+        ) : (
+          <div className="history-list">
+            {history.map((item) => (
+              <div className="history-item" key={`${item.id}-${item.created_at}`}>
+                <div className="history-copy"><span className="history-format">{item.output_format === "json" ? "JSON" : "REPORT"}</span><span className="history-question">{item.question}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time></div>
+                <button type="button" className="history-revisit" onClick={() => setQuestion(item.question)}>Research again <span>↗</span></button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <footer className="footer"><span>Dossier 2026</span><span>Sources are cited inline · Verify high-stakes decisions independently</span></footer>
