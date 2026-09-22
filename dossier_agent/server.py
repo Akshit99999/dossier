@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .agent import DossierAgent, DossierError
+from .providers import resolve_provider
 
 
 app = FastAPI(title="Dossier", description="Live-source research and fact-checking agent")
@@ -22,15 +23,28 @@ class ResearchRequest(BaseModel):
     question: str = Field(min_length=1, max_length=10_000)
     output_format: Literal["human", "json"] = "human"
     model: Optional[str] = Field(default=None, max_length=100)
+    provider: Optional[str] = Field(default=None, max_length=32)
     live_web: bool = True
 
 
 @app.get("/api/health")
 def health() -> dict[str, object]:
+    try:
+        config = resolve_provider()
+        provider_name = config.name
+        model = config.model
+        provider_configured = config.api_key_configured
+    except ValueError:
+        provider_name = "unknown"
+        model = None
+        provider_configured = False
     return {
         "status": "ok",
         "service": "dossier",
         "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "provider": provider_name,
+        "model": model,
+        "provider_configured": provider_configured,
     }
 
 
@@ -43,7 +57,11 @@ def history(limit: int = 20) -> dict[str, list[dict]]:
 @app.post("/api/research")
 def research(request: ResearchRequest) -> dict:
     try:
-        agent = DossierAgent(model=request.model or None, live_web=request.live_web)
+        agent = DossierAgent(
+            model=request.model or None,
+            provider=request.provider or None,
+            live_web=request.live_web,
+        )
         result = agent.research(request.question, output_format=request.output_format)
         payload: str | dict = result.text
         if request.output_format == "json":
@@ -54,6 +72,7 @@ def research(request: ResearchRequest) -> dict:
                 "question": request.question,
                 "output_format": request.output_format,
                 "response_id": result.response_id,
+                "provider": agent.provider_config.name,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         )
@@ -65,7 +84,7 @@ def research(request: ResearchRequest) -> dict:
     except (DossierError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        if not os.getenv("OPENAI_API_KEY"):
+        if not request.provider and not os.getenv("OPENAI_API_KEY"):
             raise HTTPException(
                 status_code=503,
                 detail="OPENAI_API_KEY is not configured. Add it to the server environment and restart Dossier.",
