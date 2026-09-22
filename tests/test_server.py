@@ -24,7 +24,11 @@ class FakeAgent:
 def test_health_endpoint():
     response = TestClient(server.app).get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "dossier"}
+    assert response.json() == {
+        "status": "ok",
+        "service": "dossier",
+        "openai_configured": False,
+    }
 
 
 def test_research_endpoint_returns_json(monkeypatch):
