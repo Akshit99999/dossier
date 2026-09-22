@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Iterator
+from typing import Iterator, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, create_engine, select
 from sqlalchemy.engine import Engine
@@ -42,8 +42,8 @@ class ResearchRun(Base):
     provider: Mapped[str] = mapped_column(String(32))
     model: Mapped[str] = mapped_column(String(160))
     result_text: Mapped[str] = mapped_column(Text)
-    response_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
-    follow_up_of: Mapped[int | None] = mapped_column(ForeignKey("research_runs.id"), nullable=True)
+    response_id: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    follow_up_of: Mapped[Optional[int]] = mapped_column(ForeignKey("research_runs.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
     )
