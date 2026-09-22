@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import os
-import json
+from collections import deque
+from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import uvicorn
@@ -11,10 +12,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .agent import DossierAgent, DossierError
-from .storage import list_recent_runs, save_research_run, storage_configured
 
 
 app = FastAPI(title="Dossier", description="Live-source research and fact-checking agent")
+recent_history: deque[dict] = deque(maxlen=50)
 
 
 class ResearchRequest(BaseModel):
@@ -30,16 +31,13 @@ def health() -> dict[str, object]:
         "status": "ok",
         "service": "dossier",
         "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
-        "database_configured": storage_configured(),
     }
 
 
 @app.get("/api/history")
 def history(limit: int = 20) -> dict[str, list[dict]]:
-    try:
-        return {"items": list_recent_runs(limit)}
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="Research history is temporarily unavailable.") from exc
+    safe_limit = max(1, min(limit, 50))
+    return {"items": list(recent_history)[:safe_limit]}
 
 
 @app.post("/api/research")
@@ -50,11 +48,14 @@ def research(request: ResearchRequest) -> dict:
         payload: str | dict = result.text
         if request.output_format == "json":
             payload = result.as_json()
-        save_research_run(
-            question=request.question,
-            output_format=request.output_format,
-            result=payload if isinstance(payload, str) else json.dumps(payload),
-            response_id=result.response_id,
+        recent_history.appendleft(
+            {
+                "id": len(recent_history) + 1,
+                "question": request.question,
+                "output_format": request.output_format,
+                "response_id": result.response_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
         )
         return {
             "format": request.output_format,
