@@ -12,6 +12,7 @@ from typing import Literal, Optional
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from .agent import DossierAgent, DossierError
@@ -82,6 +83,24 @@ def health() -> dict[str, object]:
         "auth_required": auth_required(),
         "auth_secret_configured": bool(os.getenv("DOSSIER_AUTH_SECRET")),
     }
+
+
+@app.get("/api/health/live")
+def liveness() -> dict[str, str]:
+    return {"status": "ok", "service": "dossier"}
+
+
+@app.get("/api/health/ready")
+def readiness() -> dict[str, object]:
+    if not database_configured():
+        return {"status": "ready", "database": "not_configured", "service": "dossier"}
+    try:
+        ensure_database()
+        with session_scope() as session:
+            session.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "ok", "service": "dossier"}
+    except (StorageNotConfigured, SQLAlchemyError) as exc:
+        raise HTTPException(status_code=503, detail="Database is not ready.") from exc
 
 
 @app.get("/api/history")
