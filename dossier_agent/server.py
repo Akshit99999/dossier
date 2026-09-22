@@ -71,7 +71,7 @@ def history(limit: int = 20) -> dict[str, list[dict]]:
 
 
 def enforce_rate_limit(request: Request) -> None:
-    """Keep unauthenticated deployments safe until account quotas exist."""
+    """Keep the lightweight in-memory deployment safe from accidental bursts."""
 
     client_key = request.client.host if request.client else "unknown"
     now = time.monotonic()
