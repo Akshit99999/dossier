@@ -61,7 +61,7 @@ function renderWithLinks(text: string) {
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [format, setFormat] = useState<OutputFormat>("human");
-  const [provider, setProvider] = useState("openai");
+  const [provider, setProvider] = useState("deepseek");
   const [model, setModel] = useState("");
   const [liveWeb, setLiveWeb] = useState(true);
   const [runState, setRunState] = useState<RunState>("idle");
@@ -302,9 +302,9 @@ export default function Home() {
             <label className="select-wrap" htmlFor="provider">
               <span>Provider</span>
               <select id="provider" value={provider} onChange={(event) => setProvider(event.target.value)}>
-                <option value="openai">OpenAI + web search</option>
                 <option value="deepseek">DeepSeek API</option>
                 <option value="local">Local vLLM / Qwen</option>
+                <option value="openai">OpenAI + web search</option>
               </select>
             </label>
             <label className="select-wrap" htmlFor="output-format">
