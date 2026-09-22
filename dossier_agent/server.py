@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import os
+import time
 from collections import deque
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from .agent import DossierAgent, DossierError
@@ -17,6 +18,9 @@ from .providers import resolve_provider
 
 app = FastAPI(title="Dossier", description="Live-source research and fact-checking agent")
 recent_history: deque[dict] = deque(maxlen=50)
+research_rate_windows: dict[str, deque[float]] = {}
+RATE_LIMIT_REQUESTS = 10
+RATE_LIMIT_WINDOW_SECONDS = 60.0
 
 
 class ResearchRequest(BaseModel):
@@ -54,8 +58,25 @@ def history(limit: int = 20) -> dict[str, list[dict]]:
     return {"items": list(recent_history)[:safe_limit]}
 
 
+def enforce_rate_limit(request: Request) -> None:
+    """Keep unauthenticated deployments safe until account quotas exist."""
+
+    client_key = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+    window = research_rate_windows.setdefault(client_key, deque())
+    while window and now - window[0] >= RATE_LIMIT_WINDOW_SECONDS:
+        window.popleft()
+    if len(window) >= RATE_LIMIT_REQUESTS:
+        raise HTTPException(
+            status_code=429,
+            detail="Research rate limit reached. Please wait a minute and try again.",
+        )
+    window.append(now)
+
+
 @app.post("/api/research")
-def research(request: ResearchRequest) -> dict:
+def research(request: ResearchRequest, http_request: Request) -> dict:
+    enforce_rate_limit(http_request)
     try:
         agent = DossierAgent(
             model=request.model or None,
