@@ -13,6 +13,8 @@ type ApiResponse = {
 
 type HealthResponse = {
   openai_configured?: boolean;
+  provider?: string;
+  provider_configured?: boolean;
 };
 
 type HistoryItem = {
@@ -56,6 +58,7 @@ function renderWithLinks(text: string) {
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [format, setFormat] = useState<OutputFormat>("human");
+  const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState("");
   const [liveWeb, setLiveWeb] = useState(true);
   const [runState, setRunState] = useState<RunState>("idle");
@@ -79,7 +82,10 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/health")
       .then((res) => res.json() as Promise<HealthResponse>)
-      .then((health) => setApiReady(health.openai_configured !== false))
+      .then((health) => {
+        setApiReady(health.provider_configured !== false);
+        if (health.provider) setProvider(health.provider);
+      })
       .catch(() => setApiReady(null));
     loadHistory();
   }, []);
@@ -107,6 +113,7 @@ export default function Home() {
           question: trimmedQuestion,
           output_format: format,
           model: model.trim() || null,
+          provider,
           live_web: liveWeb,
         }),
       });
@@ -187,6 +194,14 @@ export default function Home() {
             ))}
           </div>
           <div className="controls">
+            <label className="select-wrap" htmlFor="provider">
+              <span>Provider</span>
+              <select id="provider" value={provider} onChange={(event) => setProvider(event.target.value)}>
+                <option value="openai">OpenAI + web search</option>
+                <option value="deepseek">DeepSeek API</option>
+                <option value="local">Local vLLM / Qwen</option>
+              </select>
+            </label>
             <label className="select-wrap" htmlFor="output-format">
               <span>Output</span>
               <select id="output-format" value={format} onChange={(event) => setFormat(event.target.value as OutputFormat)}>
