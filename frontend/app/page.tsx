@@ -66,6 +66,7 @@ export default function Home() {
   const [liveWeb, setLiveWeb] = useState(true);
   const [runState, setRunState] = useState<RunState>("idle");
   const [response, setResponse] = useState<ApiResponse | null>(null);
+  const [lastResearchId, setLastResearchId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [followUp, setFollowUp] = useState("");
@@ -116,7 +117,7 @@ export default function Home() {
     [response],
   );
 
-  async function investigate(trimmedQuestion: string) {
+  async function investigate(trimmedQuestion: string, followUpOf: number | null = null) {
     setRunState("loading");
     setResponse(null);
     setError("");
@@ -135,11 +136,13 @@ export default function Home() {
           model: model.trim() || null,
           provider,
           live_web: liveWeb,
+          follow_up_of: followUpOf,
         }),
       });
       const payload = (await result.json()) as ApiResponse & { detail?: string };
       if (!result.ok) throw new Error(payload.detail || "The research request failed.");
       setResponse(payload);
+      setLastResearchId(payload.research_id ?? null);
       setRunState("ready");
       loadHistory();
     } catch (requestError) {
@@ -181,7 +184,7 @@ export default function Home() {
     const nextQuestion = `${question.trim()}\n\nFollow-up request: ${trimmedFollowUp}`;
     setQuestion(nextQuestion);
     setFollowUp("");
-    await investigate(nextQuestion);
+    await investigate(nextQuestion, lastResearchId);
   }
 
   async function handleAuth(event: FormEvent<HTMLFormElement>) {
