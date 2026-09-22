@@ -7,6 +7,7 @@ Dossier is a live-source research and fact-checking agent. It breaks questions i
 - Next.js 16 App Router + React 19 + TypeScript frontend
 - FastAPI + Uvicorn research API
 - OpenAI Responses API with the built-in `web_search` tool
+- Provider switching for OpenAI, DeepSeek, and local vLLM-compatible models
 - Optional in-memory session history (MySQL is not required right now)
 
 The API key stays on the FastAPI server. The browser only calls the Next.js `/api` proxy.
@@ -26,6 +27,24 @@ dossier-web
 ```
 
 The API runs at `http://127.0.0.1:8000`.
+
+Provider configuration:
+
+```bash
+# Default: OpenAI with native web search
+export MODEL_PROVIDER=openai
+export OPENAI_API_KEY='your-api-key'
+
+# Hosted DeepSeek
+export MODEL_PROVIDER=deepseek
+export DEEPSEEK_API_KEY='your-api-key'
+
+# Local vLLM / Qwen OpenAI-compatible server
+export MODEL_PROVIDER=local
+export LOCAL_MODEL_BASE_URL='http://127.0.0.1:8001/v1'
+```
+
+OpenAI is the only provider currently connected to the built-in web-search tool. DeepSeek and local models work for model generation; an independent search adapter will be added before using them for live-source research.
 
 ### 2. Start the Next.js frontend
 
