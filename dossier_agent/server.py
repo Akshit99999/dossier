@@ -1,25 +1,18 @@
-"""FastAPI server for the Dossier browser frontend."""
+"""FastAPI API server for the Dossier frontend."""
 
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Literal, Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .agent import DossierAgent, DossierError
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-WEB_ROOT = PROJECT_ROOT / "web"
-
 app = FastAPI(title="Dossier", description="Live-source research and fact-checking agent")
-app.mount("/static", StaticFiles(directory=WEB_ROOT), name="static")
 
 
 class ResearchRequest(BaseModel):
@@ -27,11 +20,6 @@ class ResearchRequest(BaseModel):
     output_format: Literal["human", "json"] = "human"
     model: Optional[str] = Field(default=None, max_length=100)
     live_web: bool = True
-
-
-@app.get("/", include_in_schema=False)
-def index() -> FileResponse:
-    return FileResponse(WEB_ROOT / "index.html")
 
 
 @app.get("/api/health")
