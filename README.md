@@ -6,8 +6,8 @@ Dossier is a live-source research and fact-checking agent. It breaks questions i
 
 - Next.js 16 App Router + React 19 + TypeScript frontend
 - FastAPI + Uvicorn research API
-- OpenAI Responses API with the built-in `web_search` tool
-- Provider switching for OpenAI, DeepSeek, and local vLLM-compatible models
+- OpenAI-compatible provider switching for OpenRouter, OpenAI, DeepSeek, and local vLLM-compatible models
+- OpenRouter's `openrouter/free` router for online free-model testing
 - Optional SearXNG adapter for live sources with DeepSeek and local models
 - In-memory backend history for the lightweight first deployment
 - In-memory request rate limiting
@@ -24,8 +24,9 @@ Prerequisites: Python 3.9+ and Node.js 20.9+.
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
-export MODEL_PROVIDER=deepseek
-export DEEPSEEK_API_KEY='your-api-key'
+export MODEL_PROVIDER=openrouter
+export OPENROUTER_API_KEY='your-api-key'
+export DOSSIER_MODEL=openrouter/free
 dossier-web
 ```
 
@@ -36,7 +37,12 @@ Deployment probes are available at `/api/health/live` and `/api/health/ready`; r
 Provider configuration:
 
 ```bash
-# Default: DeepSeek hosted model
+# Default: OpenRouter free router
+export MODEL_PROVIDER=openrouter
+export OPENROUTER_API_KEY='your-api-key'
+export DOSSIER_MODEL=openrouter/free
+
+# DeepSeek hosted model (paid API usage may apply)
 export MODEL_PROVIDER=deepseek
 export DEEPSEEK_API_KEY='your-api-key'
 
@@ -116,7 +122,7 @@ pytest
 cd frontend && npm run typecheck && npm run build
 ```
 
-Research requests use the OpenAI API and may incur API and web-search charges. High-stakes decisions should be independently verified.
+OpenRouter free models are intended for testing and have provider-dependent rate limits and availability. Create a key at [OpenRouter Keys](https://openrouter.ai/keys), keep it only on the API server, and use a paid model only when you need higher limits or more consistent production behavior. High-stakes decisions should be independently verified.
 
 ## License
 
