@@ -31,8 +31,8 @@ def test_health_endpoint():
         "status": "ok",
         "service": "dossier",
         "openai_configured": False,
-        "provider": "deepseek",
-        "model": "deepseek-reasoner",
+        "provider": "openrouter",
+        "model": "openrouter/free",
         "provider_configured": False,
     }
 
