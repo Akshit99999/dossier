@@ -44,7 +44,7 @@ def _search_ddg(query: str, max_results: int = 5) -> list[SearchResult]:
             snippet = str(item.get("body", "")).strip()
             if title and url:
                 results.append(SearchResult(title=title, url=url, snippet=snippet[:1200]))
-            if len(results) >= max(1, min(max_results, 10)):
+            if len(results) >= max(1, min(max_results, 15)):
                 break
         return results
     except Exception:
