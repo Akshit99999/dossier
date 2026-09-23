@@ -22,7 +22,7 @@ class ProviderConfig:
 def resolve_provider(provider: str | None = None, model: str | None = None) -> ProviderConfig:
     """Resolve provider settings from explicit values and environment variables."""
 
-    name = (provider or os.getenv("MODEL_PROVIDER", "deepseek")).strip().lower()
+    name = (provider or os.getenv("MODEL_PROVIDER", "openrouter")).strip().lower()
     if name == "openai":
         return ProviderConfig(
             name=name,
@@ -39,6 +39,14 @@ def resolve_provider(provider: str | None = None, model: str | None = None) -> P
             api_key_configured=bool(os.getenv("DEEPSEEK_API_KEY")),
             native_web_search=False,
         )
+    if name == "openrouter":
+        return ProviderConfig(
+            name=name,
+            model=model or os.getenv("DOSSIER_MODEL", "openrouter/free"),
+            base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+            api_key_configured=bool(os.getenv("OPENROUTER_API_KEY")),
+            native_web_search=False,
+        )
     if name in {"local", "vllm"}:
         return ProviderConfig(
             name="local",
@@ -47,7 +55,7 @@ def resolve_provider(provider: str | None = None, model: str | None = None) -> P
             api_key_configured=True,
             native_web_search=False,
         )
-    raise ValueError(f"Unknown MODEL_PROVIDER '{name}'. Use openai, deepseek, or local.")
+    raise ValueError(f"Unknown MODEL_PROVIDER '{name}'. Use openrouter, openai, deepseek, or local.")
 
 
 def provider_api_key(config: ProviderConfig) -> str:
@@ -55,6 +63,8 @@ def provider_api_key(config: ProviderConfig) -> str:
         return os.getenv("OPENAI_API_KEY", "")
     if config.name == "deepseek":
         return os.getenv("DEEPSEEK_API_KEY", "")
+    if config.name == "openrouter":
+        return os.getenv("OPENROUTER_API_KEY", "")
     return os.getenv("LOCAL_MODEL_API_KEY", "local")
 
 
