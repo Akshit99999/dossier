@@ -3,7 +3,22 @@ from dossier_agent import search
 
 def test_search_without_endpoint_is_optional(monkeypatch):
     monkeypatch.delenv("SEARXNG_URL", raising=False)
+    monkeypatch.setenv("ENABLE_DDG_SEARCH", "0")
     assert search.search_web("test question") == []
+
+
+def test_search_falls_back_to_ddg_when_searxng_fails(monkeypatch):
+    monkeypatch.delenv("SEARXNG_URL", raising=False)
+    monkeypatch.setattr(
+        search,
+        "_search_ddg",
+        lambda query, max_results=5: [
+            search.SearchResult("DDG Title", "https://ddg.example", "DDG Snippet")
+        ],
+    )
+    results = search.search_web("test query")
+    assert len(results) == 1
+    assert results[0].url == "https://ddg.example"
 
 
 def test_search_normalizes_and_limits_results(monkeypatch):

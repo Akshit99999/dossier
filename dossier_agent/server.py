@@ -1,7 +1,8 @@
-"""FastAPI API server for the Dossier frontend."""
+"""FastAPI API server for the Dossier frontend with durable auth and history."""
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -10,10 +11,19 @@ from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from .agent import DossierAgent, DossierError
+from .db import (
+    User,
+    authenticate_user,
+    delete_session,
+    get_db_connection,
+    get_user_by_token,
+    init_db,
+    register_user,
+)
 from .providers import resolve_provider
 
 
@@ -23,6 +33,9 @@ research_rate_windows: dict[str, deque[float]] = {}
 RATE_LIMIT_REQUESTS = 10
 RATE_LIMIT_WINDOW_SECONDS = 60.0
 
+# Initialize database tables on server module load
+init_db()
+
 
 class ResearchRequest(BaseModel):
     question: str = Field(min_length=1, max_length=10_000)
@@ -31,6 +44,67 @@ class ResearchRequest(BaseModel):
     provider: Optional[str] = Field(default=None, max_length=32)
     live_web: bool = True
     follow_up_of: Optional[int] = None
+
+
+class RegisterRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=6, max_length=255)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=1, max_length=255)
+
+
+def get_current_user_from_header(authorization: Optional[str]) -> Optional[User]:
+    """Helper to parse Bearer token from authorization header and resolve User."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization.split("Bearer ", 1)[1].strip()
+    return get_user_by_token(token)
+
+
+@app.post("/api/auth/register")
+def register(request: RegisterRequest) -> dict:
+    try:
+        user = register_user(request.email, request.password)
+        _, token = authenticate_user(request.email, request.password)
+        return {
+            "status": "ok",
+            "user": {"id": user.id, "email": user.email, "created_at": user.created_at},
+            "token": token,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/auth/login")
+def login(request: LoginRequest) -> dict:
+    try:
+        user, token = authenticate_user(request.email, request.password)
+        return {
+            "status": "ok",
+            "user": {"id": user.id, "email": user.email, "created_at": user.created_at},
+            "token": token,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+@app.get("/api/auth/me")
+def me(authorization: Optional[str] = Header(None)) -> dict:
+    user = get_current_user_from_header(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    return {"user": {"id": user.id, "email": user.email, "created_at": user.created_at}}
+
+
+@app.post("/api/auth/logout")
+def logout(authorization: Optional[str] = Header(None)) -> dict:
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ", 1)[1].strip()
+        delete_session(token)
+    return {"status": "ok"}
 
 
 @app.get("/api/health")
@@ -61,18 +135,68 @@ def liveness() -> dict[str, str]:
 
 @app.get("/api/health/ready")
 def readiness() -> dict[str, object]:
-    return {"status": "ready", "storage": "memory", "service": "dossier"}
+    return {"status": "ready", "storage": "sqlite", "service": "dossier"}
 
 
 @app.get("/api/history")
-def history(limit: int = 20) -> dict[str, list[dict]]:
+def history(
+    limit: int = 20,
+    authorization: Optional[str] = Header(None),
+) -> dict[str, list[dict]]:
     safe_limit = max(1, min(limit, 50))
-    return {"items": list(recent_history)[:safe_limit]}
+    user = get_current_user_from_header(authorization)
+
+    conn = get_db_connection()
+    try:
+        if user:
+            rows = conn.execute(
+                """
+                SELECT id, question, output_format, response_id, provider, model, result, sources, follow_up_of, created_at
+                FROM research_history
+                WHERE user_id = ?
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (user.id, safe_limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, question, output_format, response_id, provider, model, result, sources, follow_up_of, created_at
+                FROM research_history
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (safe_limit,),
+            ).fetchall()
+
+        items = []
+        for r in rows:
+            sources_list = json.loads(r["sources"]) if r["sources"] else []
+            items.append(
+                {
+                    "id": r["id"],
+                    "question": r["question"],
+                    "output_format": r["output_format"],
+                    "response_id": r["response_id"],
+                    "provider": r["provider"],
+                    "model": r["model"],
+                    "result": r["result"],
+                    "sources": sources_list,
+                    "follow_up_of": r["follow_up_of"],
+                    "created_at": r["created_at"],
+                }
+            )
+        # If DB is empty, fallback to recent in-memory items
+        if not items and recent_history:
+            return {"items": list(recent_history)[:safe_limit]}
+        return {"items": items}
+    finally:
+        conn.close()
 
 
 def enforce_rate_limit(request: Request) -> None:
-    """Keep the lightweight in-memory deployment safe from accidental bursts."""
-
+    """Keep the lightweight deployment safe from accidental bursts."""
     client_key = request.client.host if request.client else "unknown"
     now = time.monotonic()
     window = research_rate_windows.setdefault(client_key, deque())
@@ -87,8 +211,13 @@ def enforce_rate_limit(request: Request) -> None:
 
 
 @app.post("/api/research")
-def research(request: ResearchRequest, http_request: Request) -> dict:
+def research(
+    request: ResearchRequest,
+    http_request: Request,
+    authorization: Optional[str] = Header(None),
+) -> dict:
     enforce_rate_limit(http_request)
+    user = get_current_user_from_header(authorization)
     try:
         agent = DossierAgent(
             model=request.model or None,
@@ -99,8 +228,37 @@ def research(request: ResearchRequest, http_request: Request) -> dict:
         payload: str | dict = result.text
         if request.output_format == "json":
             payload = result.as_json()
-        history_id = len(recent_history) + 1
         source_urls = extract_urls(result.text)
+
+        # Persist to SQLite database
+        now_iso = datetime.now(timezone.utc).isoformat()
+        conn = get_db_connection()
+        history_id: int
+        try:
+            with conn:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO research_history (
+                        user_id, question, output_format, response_id, provider, model, result, sources, follow_up_of, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        user.id if user else None,
+                        request.question,
+                        request.output_format,
+                        result.response_id,
+                        agent.provider_config.name,
+                        agent.model,
+                        result.text,
+                        json.dumps(source_urls),
+                        request.follow_up_of,
+                        now_iso,
+                    ),
+                )
+                history_id = cursor.lastrowid
+        finally:
+            conn.close()
+
         recent_history.appendleft(
             {
                 "id": history_id,
@@ -112,7 +270,7 @@ def research(request: ResearchRequest, http_request: Request) -> dict:
                 "result": result.text,
                 "sources": source_urls,
                 "follow_up_of": request.follow_up_of,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": now_iso,
             }
         )
         return {

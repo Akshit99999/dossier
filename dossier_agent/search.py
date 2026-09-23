@@ -22,6 +22,35 @@ class SearchResult:
     snippet: str
 
 
+def _search_ddg(query: str, max_results: int = 5) -> list[SearchResult]:
+    """Search DuckDuckGo via ddgs and return normalized results."""
+    try:
+        try:
+            from ddgs import DDGS
+        except ImportError:
+            from duckduckgo_search import DDGS  # type: ignore[no-redef]
+    except ImportError:
+        return []
+
+    try:
+        client = DDGS()
+        raw_items = list(client.text(query.strip(), max_results=max_results))
+        results: list[SearchResult] = []
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title", "")).strip()
+            url = str(item.get("href", "")).strip()
+            snippet = str(item.get("body", "")).strip()
+            if title and url:
+                results.append(SearchResult(title=title, url=url, snippet=snippet[:1200]))
+            if len(results) >= max(1, min(max_results, 10)):
+                break
+        return results
+    except Exception:
+        return []
+
+
 def search_web(
     query: str,
     *,
@@ -29,44 +58,50 @@ def search_web(
     max_results: int = 5,
     timeout: float = 12.0,
 ) -> list[SearchResult]:
-    """Search a SearXNG instance and return normalized results.
+    """Search using SearXNG if configured, or DuckDuckGo by default.
 
-    The endpoint is intentionally optional: deployments that do not configure
-    SearXNG should still run, with the agent clearly marking claims unverified.
+    Deployments that do not configure SearXNG will automatically use
+    DuckDuckGo for zero-configuration live sources.
     """
 
-    base_url = (endpoint or os.getenv("SEARXNG_URL", "")).strip().rstrip("/")
-    if not base_url:
-        return []
     if not query.strip():
         return []
 
-    try:
-        response = httpx.get(
-            f"{base_url}/search",
-            params={"q": query.strip(), "format": "json", "language": "all"},
-            headers={"Accept": "application/json"},
-            timeout=timeout,
-            follow_redirects=True,
-        )
-        response.raise_for_status()
-        payload: Any = response.json()
-    except (httpx.HTTPError, ValueError) as exc:
-        raise SearchError(f"SearXNG search failed: {exc}") from exc
+    base_url = (endpoint or os.getenv("SEARXNG_URL", "")).strip().rstrip("/")
+    if base_url:
+        try:
+            response = httpx.get(
+                f"{base_url}/search",
+                params={"q": query.strip(), "format": "json", "language": "all"},
+                headers={"Accept": "application/json"},
+                timeout=timeout,
+                follow_redirects=True,
+            )
+            response.raise_for_status()
+            payload: Any = response.json()
+            raw_results = payload.get("results", []) if isinstance(payload, dict) else []
+            normalized: list[SearchResult] = []
+            for item in raw_results:
+                if not isinstance(item, dict):
+                    continue
+                title = str(item.get("title", "")).strip()
+                url = str(item.get("url", "")).strip()
+                snippet = str(item.get("content", "")).strip()
+                if title and url:
+                    normalized.append(SearchResult(title=title, url=url, snippet=snippet[:1200]))
+                if len(normalized) >= max(1, min(max_results, 10)):
+                    break
+            if normalized:
+                return normalized
+        except (httpx.HTTPError, ValueError):
+            pass
 
-    raw_results = payload.get("results", []) if isinstance(payload, dict) else []
-    normalized: list[SearchResult] = []
-    for item in raw_results:
-        if not isinstance(item, dict):
-            continue
-        title = str(item.get("title", "")).strip()
-        url = str(item.get("url", "")).strip()
-        snippet = str(item.get("content", "")).strip()
-        if title and url:
-            normalized.append(SearchResult(title=title, url=url, snippet=snippet[:1200]))
-        if len(normalized) >= max(1, min(max_results, 10)):
-            break
-    return normalized
+    # Default to DuckDuckGo when SearXNG is unconfigured or yields no results
+    ddg_engine = os.getenv("ENABLE_DDG_SEARCH", "1")
+    if ddg_engine != "0":
+        return _search_ddg(query, max_results=max_results)
+
+    return []
 
 
 def format_search_context(results: list[SearchResult]) -> str:
