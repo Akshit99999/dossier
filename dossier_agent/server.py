@@ -40,6 +40,7 @@ init_db()
 class ResearchRequest(BaseModel):
     question: str = Field(min_length=1, max_length=10_000)
     output_format: Literal["human", "json"] = "human"
+    depth: Literal["surface", "deep", "phd", "soul_shattering"] = "deep"
     model: Optional[str] = Field(default=None, max_length=100)
     provider: Optional[str] = Field(default=None, max_length=32)
     live_web: bool = True
@@ -224,7 +225,11 @@ def research(
             provider=request.provider or None,
             live_web=request.live_web,
         )
-        result = agent.research(request.question, output_format=request.output_format)
+        result = agent.research(
+            request.question,
+            output_format=request.output_format,
+            depth=request.depth,
+        )
         payload: str | dict = result.text
         if request.output_format == "json":
             payload = result.as_json()
